@@ -21,6 +21,7 @@ COPY ansible.cfg /etc/ansible/ansible.cfg
 
 # Copy playbooks and inventory
 COPY . /ansible
+RUN chmod +x /ansible/tools/vdt.py 2>/dev/null || true
 
 # Create ansible server script
 RUN cat > /ansible/ansible_server.py << 'EOF'

@@ -1,7 +1,7 @@
----
-
 esxi_username: root
-
 esxi_password: Ajay@426344
-
+ansible_user: root
+ansible_password: Ajay@426344
+ansible_connection: ssh
+ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
 ansible_python_interpreter: /usr/bin/python

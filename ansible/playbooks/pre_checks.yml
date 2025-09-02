@@ -1,5 +1,5 @@
 ---
-- name: ESXi Pre-Patching Checks
+- name: ESXi Pre-Patching Checks with VDT
   hosts: all
   gather_facts: no
   vars:
@@ -24,6 +24,10 @@
           free_space=$(vim-cmd hostsvc/datastore/info "$ds" | grep 'freeSpace' | cut -d'=' -f2 | cut -d',' -f1)
           free_gb=$((free_space / 1073741824))
           echo "$ds: ${free_gb}GB"
+          if [ $free_gb -gt 2 ]; then
+            echo "DATASTORE_OK: $ds has ${free_gb}GB free"
+            break
+          fi
         done
       register: datastore_info
 
@@ -31,14 +35,27 @@
       shell: vim-cmd vmsvc/getallvms | grep -v "^Vmid" | wc -l
       register: vm_count
 
-    - name: Run VDT tool if available
+    - name: Copy VDT tool to host
+      copy:
+        src: ../tools/vdt.py
+        dest: /tmp/vdt.py
+        mode: '0755'
+      ignore_errors: yes
+
+    - name: Run VDT tool validation
       shell: |
-        if [ -f /opt/vdt/vdt.py ]; then
-          python /opt/vdt/vdt.py --check
+        if [ -f /tmp/vdt.py ]; then
+          python /tmp/vdt.py --check
         else
-          echo "VDT tool not found"
+          echo "VDT tool not available - skipping"
         fi
       register: vdt_result
+      ignore_errors: yes
+
+    - name: Clean up VDT tool
+      file:
+        path: /tmp/vdt.py
+        state: absent
       ignore_errors: yes
 
     - name: Store pre-check results
@@ -48,9 +65,16 @@
           esxi_version: "{{ esxi_version.stdout }}"
           datastore_info: "{{ datastore_info.stdout }}"
           vm_count: "{{ vm_count.stdout }}"
-          vdt_check: "{{ vdt_result.stdout }}"
+          vdt_check: "{{ vdt_result.stdout | default('VDT check skipped') }}"
 
     - name: Fail if insufficient datastore space
       fail:
         msg: "Insufficient datastore space. Need at least 2GB free."
-      when: "'2GB' not in datastore_info.stdout and '3GB' not in datastore_info.stdout"
+      when: "'DATASTORE_OK' not in datastore_info.stdout"
+
+    - name: Fail if VDT check failed
+      fail:
+        msg: "VDT validation failed: {{ vdt_result.stdout }}"
+      when: 
+        - vdt_result.stdout is defined
+        - "'FAILED' in vdt_result.stdout or 'ERROR' in vdt_result.stdout"

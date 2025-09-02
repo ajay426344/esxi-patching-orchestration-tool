@@ -42,13 +42,44 @@
                 <button onclick="refreshAll()">Refresh All Hosts</button>
             </div>
 
+            <!-- Add Hosts Section -->
+            <div id="add-hosts-section" class="admin-panel" style="display:none">
+                <h3>Add ESXi Hosts</h3>
+                <div class="control-group">
+                    <label>Enter IP Addresses (one per line):</label>
+                    <textarea id="host-ips" rows="5" cols="50" placeholder="192.168.1.10
+192.168.1.11
+192.168.1.12"></textarea>
+                    <button onclick="addHosts()">Add Hosts</button>
+                </div>
+            </div>
+
+            <!-- Patch Upload Section -->
+            <div id="patch-upload-section" class="admin-panel" style="display:none">
+                <h3>Patch Management</h3>
+                <div class="control-group">
+                    <label>Upload ESXi Patch File:</label>
+                    <input type="file" id="patch-file" accept=".zip">
+                    <button onclick="uploadPatch()">Upload Patch</button>
+                    <div id="upload-status"></div>
+                    <div id="upload-progress" style="display:none">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <span id="progress-text">0%</span>
+                    </div>
+                </div>
+                
+                <!-- List of uploaded patches -->
+                <div class="control-group">
+                    <h4>Available Patches:</h4>
+                    <div id="patch-list">Loading...</div>
+                </div>
+            </div>
+
             <!-- Admin Controls -->
             <div id="admin-controls" class="admin-panel" style="display:none">
                 <h2>Admin Controls</h2>
-                <div class="control-group">
-                    <input type="file" id="patch-file" accept=".zip">
-                    <button onclick="uploadPatch()">Upload Patch</button>
-                </div>
                 <div class="control-group">
                     <button onclick="runPreChecks()">Run Pre-Checks</button>
                     <button onclick="runPhase1()">Execute Phase 1</button>
