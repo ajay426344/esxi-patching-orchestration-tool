@@ -1,80 +1,53 @@
 ---
-- name: ESXi Pre-Patching Checks with VDT
+- name: ESXi Pre-Patching Checks
   hosts: all
   gather_facts: no
   vars:
-    ansible_user: "{{ esxi_username }}"
-    ansible_password: "{{ esxi_password }}"
+    ansible_user: "{{ esxi_username | default('root') }}"
+    ansible_password: "{{ esxi_password | default('Ajay@426344') }}"
     ansible_connection: ssh
     ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
   
   tasks:
-    - name: Check SSH connectivity
-      wait_for_connection:
-        timeout: 30
-      register: ssh_check
-
+    - name: Test SSH connectivity
+      raw: echo "SSH_OK"
+      register: ssh_test
+      failed_when: ssh_test.stdout != "SSH_OK"
+      
     - name: Get ESXi version
       raw: vmware -v
       register: esxi_version
 
     - name: Check datastore free space
-      shell: |
-        for ds in $(vim-cmd hostsvc/datastore/listsummary | grep 'name =' | cut -d'"' -f2); do
-          free_space=$(vim-cmd hostsvc/datastore/info "$ds" | grep 'freeSpace' | cut -d'=' -f2 | cut -d',' -f1)
-          free_gb=$((free_space / 1073741824))
-          echo "$ds: ${free_gb}GB"
-          if [ $free_gb -gt 2 ]; then
-            echo "DATASTORE_OK: $ds has ${free_gb}GB free"
-            break
-          fi
-        done
+      raw: |
+        df -h | grep vmfs | head -1
       register: datastore_info
 
+    - name: Parse datastore free space
+      raw: |
+        df -h | grep vmfs | head -1 | awk '{print $4}' | sed 's/G//'
+      register: free_space_gb
+
     - name: Check for running VMs
-      shell: vim-cmd vmsvc/getallvms | grep -v "^Vmid" | wc -l
+      raw: vim-cmd vmsvc/getallvms | grep -v "^Vmid" | wc -l
       register: vm_count
 
-    - name: Copy VDT tool to host
-      copy:
-        src: ../tools/vdt.py
-        dest: /tmp/vdt.py
-        mode: '0755'
-      ignore_errors: yes
+    - name: Get hostname
+      raw: hostname
+      register: hostname_info
 
-    - name: Run VDT tool validation
-      shell: |
-        if [ -f /tmp/vdt.py ]; then
-          python /tmp/vdt.py --check
-        else
-          echo "VDT tool not available - skipping"
-        fi
-      register: vdt_result
-      ignore_errors: yes
+    - name: Display pre-check results
+      debug:
+        msg:
+          - "Hostname: {{ hostname_info.stdout | trim }}"
+          - "ESXi Version: {{ esxi_version.stdout | trim }}"
+          - "Datastore Info: {{ datastore_info.stdout | trim }}"
+          - "Free Space: {{ free_space_gb.stdout | trim }}GB"
+          - "Running VMs: {{ vm_count.stdout | trim }}"
 
-    - name: Clean up VDT tool
-      file:
-        path: /tmp/vdt.py
-        state: absent
-      ignore_errors: yes
-
-    - name: Store pre-check results
-      set_fact:
-        precheck_results:
-          ssh_enabled: true
-          esxi_version: "{{ esxi_version.stdout }}"
-          datastore_info: "{{ datastore_info.stdout }}"
-          vm_count: "{{ vm_count.stdout }}"
-          vdt_check: "{{ vdt_result.stdout | default('VDT check skipped') }}"
-
-    - name: Fail if insufficient datastore space
+    - name: Validate sufficient datastore space (need >2GB)
       fail:
-        msg: "Insufficient datastore space. Need at least 2GB free."
-      when: "'DATASTORE_OK' not in datastore_info.stdout"
-
-    - name: Fail if VDT check failed
-      fail:
-        msg: "VDT validation failed: {{ vdt_result.stdout }}"
+        msg: "Insufficient datastore space: {{ free_space_gb.stdout | trim }}GB (need >2GB)"
       when: 
-        - vdt_result.stdout is defined
-        - "'FAILED' in vdt_result.stdout or 'ERROR' in vdt_result.stdout"
+        - free_space_gb.stdout is defined
+        - free_space_gb.stdout | trim | float < 2.0

@@ -71,35 +71,43 @@ def run_ansible_playbook(playbook: str, hosts: List[str], extra_vars: dict = Non
     """Execute Ansible playbook via ansible_server API"""
     import requests
     
+    # Ensure credentials are passed
+    if extra_vars is None:
+        extra_vars = {}
+    
+    extra_vars.update({
+        'esxi_username': os.getenv("ESXI_USERNAME", "root"),
+        'esxi_password': os.getenv("ESXI_PASSWORD", "Ajay@426344"),
+        'ansible_user': os.getenv("ESXI_USERNAME", "root"),
+        'ansible_password': os.getenv("ESXI_PASSWORD", "Ajay@426344")
+    })
+    
     ansible_url = f"http://{os.getenv('ANSIBLE_HOST', 'ansible')}:{os.getenv('ANSIBLE_PORT', '5555')}/run-playbook"
     
     payload = {
         "playbook": playbook,
         "inventory": hosts,
-        "extra_vars": extra_vars or {}
+        "extra_vars": extra_vars
     }
     
     try:
         response = requests.post(ansible_url, json=payload, timeout=300)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"Ansible server returned status {response.status_code}"
-            }
+        result = response.json()
+        print(f"Ansible playbook {playbook} result: {result.get('success')}")
+        return result
     except Exception as e:
-        # Fallback to direct execution if ansible server is not available
+        print(f"Ansible server error: {e}")
+        # Fallback to subprocess
+        import subprocess
+        import json
+        
         inventory = ",".join(hosts) + ","
         cmd = [
             "ansible-playbook",
-            f"ansible/playbooks/{playbook}",
+            f"/ansible/playbooks/{playbook}",
             "-i", inventory,
+            "--extra-vars", json.dumps(extra_vars)
         ]
-        
-        if extra_vars:
-            cmd.extend(["--extra-vars", json.dumps(extra_vars)])
         
         result = subprocess.run(cmd, capture_output=True, text=True)
         return {
@@ -107,7 +115,6 @@ def run_ansible_playbook(playbook: str, hosts: List[str], extra_vars: dict = Non
             "stdout": result.stdout,
             "stderr": result.stderr
         }
-
 def check_ssh_connectivity(host_ip: str, username: str = None, password: str = None):
     """Check if SSH is enabled on host"""
     try:
