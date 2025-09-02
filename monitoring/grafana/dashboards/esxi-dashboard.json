@@ -1,0 +1,37 @@
+{
+  "dashboard": {
+    "title": "ESXi Patching Dashboard",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total Hosts",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(esxi_host_status)"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Patching Success Rate",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "sum(esxi_patching_success) / sum(esxi_patching_total) * 100"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Job Queue",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "esxi_jobs_pending"
+          }
+        ]
+      }
+    ]
+  }
+}

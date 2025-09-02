@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESXi Patching Orchestrator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <nav class="navbar">
+            <h1>ESXi Patching Orchestrator</h1>
+            <div class="nav-items">
+                <span id="user-info"></span>
+                <button id="login-btn" onclick="showLogin()">Admin Login</button>
+                <button id="logout-btn" onclick="logout()" style="display:none">Logout</button>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- Login Modal -->
+            <div id="login-modal" class="modal">
+                <div class="modal-content">
+                    <h2>Admin Login</h2>
+                    <input type="text" id="username" placeholder="Username">
+                    <input type="password" id="password" placeholder="Password">
+                    <button onclick="login()">Login</button>
+                    <button onclick="closeLogin()">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters">
+                <label>Filter by:</label>
+                <select id="date-filter" onchange="filterData()">
+                    <option value="all">All Time</option>
+                    <option value="24">Last 24 Hours</option>
+                    <option value="72">Last 3 Days</option>
+                    <option value="168">Last Week</option>
+                    <option value="720">Last Month</option>
+                </select>
+                <button onclick="refreshAll()">Refresh All Hosts</button>
+            </div>
+
+            <!-- Admin Controls -->
+            <div id="admin-controls" class="admin-panel" style="display:none">
+                <h2>Admin Controls</h2>
+                <div class="control-group">
+                    <input type="file" id="patch-file" accept=".zip">
+                    <button onclick="uploadPatch()">Upload Patch</button>
+                </div>
+                <div class="control-group">
+                    <button onclick="runPreChecks()">Run Pre-Checks</button>
+                    <button onclick="runPhase1()">Execute Phase 1</button>
+                    <button onclick="runPhase2()">Execute Phase 2</button>
+                </div>
+                <div class="control-group">
+                    <h3>Threshold Settings</h3>
+                    <label>Auto Phase 2 Window (minutes): 
+                        <input type="number" id="threshold-window" value="10">
+                    </label>
+                    <label>Reboot Grace Period (minutes): 
+                        <input type="number" id="grace-period" value="2">
+                    </label>
+                    <button onclick="saveSettings()">Save Settings</button>
+                </div>
+            </div>
+
+            <!-- Hosts Dashboard -->
+            <div class="dashboard">
+                <h2>Hosts Status Dashboard</h2>
+                <div class="stats">
+                    <div class="stat-card">
+                        <h3>Total Hosts</h3>
+                        <p id="total-hosts">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Pre-Check Passed</h3>
+                        <p id="precheck-passed">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Phase 1 Complete</h3>
+                        <p id="phase1-complete">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Fully Patched</h3>
+                        <p id="fully-patched">0</p>
+                    </div>
+                </div>
+
+                <table id="hosts-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all"></th>
+                            <th>IP Address</th>
+                            <th>Hostname</th>
+                            <th>Current Build</th>
+                            <th>Target Build</th>
+                            <th>Status</th>
+                            <th>SSH</th>
+                            <th>Last Checked</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hosts-tbody"></tbody>
+                </table>
+            </div>
+
+            <!-- Running Jobs -->
+            <div class="jobs-panel">
+                <h2>Running Jobs</h2>
+                <div id="running-jobs"></div>
+            </div>
+
+            <!-- Job History -->
+            <div class="history-panel">
+                <h2>Job History</h2>
+                <table id="jobs-table">
+                    <thead>
+                        <tr>
+                            <th>Host IP</th>
+                            <th>Job Type</th>
+                            <th>Status</th>
+                            <th>Started</th>
+                            <th>Completed</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobs-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

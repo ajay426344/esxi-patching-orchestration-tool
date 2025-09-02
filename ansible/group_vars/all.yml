@@ -1,0 +1,7 @@
+---
+
+esxi_username: root
+
+esxi_password: Ajay@426344
+
+ansible_python_interpreter: /usr/bin/python

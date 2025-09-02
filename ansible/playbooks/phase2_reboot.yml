@@ -1,0 +1,53 @@
+---
+- name: ESXi Phase 2 - Reboot and Verify
+  hosts: all
+  gather_facts: no
+  vars:
+    ansible_user: "{{ esxi_username }}"
+    ansible_password: "{{ esxi_password }}"
+    ansible_connection: ssh
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+  
+  tasks:
+    - name: Put host in maintenance mode
+      shell: vim-cmd hostsvc/maintenance_mode_enter
+      register: maintenance_result
+
+    - name: Shutdown running VMs gracefully
+      shell: |
+        for vmid in $(vim-cmd vmsvc/getallvms | grep -v "^Vmid" | awk '{print $1}'); do
+          vim-cmd vmsvc/power.shutdown $vmid
+        done
+      ignore_errors: yes
+
+    - name: Wait for VMs to shutdown
+      pause:
+        seconds: 60
+
+    - name: Reboot the ESXi host
+      reboot:
+        reboot_timeout: 900
+        msg: "Rebooting for patch installation"
+      
+    - name: Wait for host to come back online
+      wait_for_connection:
+        delay: 120
+        timeout: 600
+
+    - name: Exit maintenance mode
+      shell: vim-cmd hostsvc/maintenance_mode_exit
+      
+    - name: Verify new build version
+      shell: vmware -v
+      register: new_version
+
+    - name: Power on VMs
+      shell: |
+        for vmid in $(vim-cmd vmsvc/getallvms | grep -v "^Vmid" | awk '{print $1}'); do
+          vim-cmd vmsvc/power.on $vmid
+        done
+      ignore_errors: yes
+
+    - name: Display patching result
+      debug:
+        msg: "Host successfully patched to: {{ new_version.stdout }}"

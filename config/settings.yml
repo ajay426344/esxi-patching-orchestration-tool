@@ -1,0 +1,26 @@
+# Application Settings
+app:
+  name: "ESXi Orchestrator"
+  version: "1.0.0"
+  debug: false
+
+# Patching Settings
+patching:
+  phase1_timeout: 1800  # 30 minutes
+  phase2_timeout: 3600  # 60 minutes
+  reboot_grace_period: 120  # 2 minutes
+  max_retry_attempts: 20
+  retry_interval: 30  # seconds
+
+# Thresholds
+thresholds:
+  auto_phase2_window: 600  # 10 minutes
+  datastore_min_free_gb: 2
+  ssh_timeout: 30
+  host_reachable_timeout: 900  # 15 minutes
+
+# Scheduler Settings
+scheduler:
+  phase2_check_interval: 43200  # 12 hours
+  cleanup_old_jobs_days: 30
+  health_check_interval: 300  # 5 minutes

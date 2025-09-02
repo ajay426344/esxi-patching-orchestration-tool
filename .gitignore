@@ -1,0 +1,47 @@
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Data directories
+data/
+backups/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+
+# Ansible
+*.retry
+ansible/patches/*.zip
+
+# Database
+*.db
+*.sqlite
+*.sql
+
+# Docker
+docker-compose.override.yml

@@ -1,0 +1,139 @@
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: esxi-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-esxi_orchestrator}
+      POSTGRES_USER: ${DB_USER:-esxi_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SecurePass123!}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-esxi_admin} -d ${DB_NAME:-esxi_orchestrator}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - esxi-net
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: esxi-backend
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-esxi_admin}:${DB_PASSWORD:-SecurePass123!}@db:5432/${DB_NAME:-esxi_orchestrator}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-here}
+      ANSIBLE_HOST: ansible
+      ANSIBLE_PORT: 5555
+      ESXI_USERNAME: ${ESXI_USERNAME:-root}
+      ESXI_PASSWORD: ${ESXI_PASSWORD:-YourESXiPassword}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-ajay}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Ajay@426344}
+    volumes:
+      - ./backend:/app
+      - ./data/patches:/app/patches
+      - ./data/logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - esxi-net
+    restart: unless-stopped
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: esxi-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - esxi-net
+    restart: unless-stopped
+
+  # Scheduler Service
+  scheduler:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: esxi-scheduler
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-esxi_admin}:${DB_PASSWORD:-SecurePass123!}@db:5432/${DB_NAME:-esxi_orchestrator}
+      REDIS_URL: redis://redis:6379/0
+      API_URL: http://backend:8000
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-ajay}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Ajay@426344}
+    volumes:
+      - ./backend:/app
+      - ./data/logs:/app/logs
+    depends_on:
+      backend:
+        condition: service_started
+    command: python scheduler.py
+    networks:
+      - esxi-net
+    restart: unless-stopped
+
+  # Ansible Controller
+  ansible:
+    build:
+      context: ./ansible
+      dockerfile: Dockerfile
+    container_name: esxi-ansible
+    environment:
+      ANSIBLE_HOST_KEY_CHECKING: "False"
+      ANSIBLE_RETRY_FILES_ENABLED: "False"
+      ESXI_USERNAME: ${ESXI_USERNAME:-root}
+      ESXI_PASSWORD: ${ESXI_PASSWORD:-YourESXiPassword}
+    volumes:
+      - ./ansible:/ansible
+      - ./data/patches:/ansible/patches
+    ports:
+      - "5555:5555"
+    networks:
+      - esxi-net
+    restart: unless-stopped
+
+  # Frontend Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: esxi-frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    networks:
+      - esxi-net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  esxi-net:
+    driver: bridge

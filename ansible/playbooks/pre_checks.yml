@@ -1,0 +1,56 @@
+---
+- name: ESXi Pre-Patching Checks
+  hosts: all
+  gather_facts: no
+  vars:
+    ansible_user: "{{ esxi_username }}"
+    ansible_password: "{{ esxi_password }}"
+    ansible_connection: ssh
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+  
+  tasks:
+    - name: Check SSH connectivity
+      wait_for_connection:
+        timeout: 30
+      register: ssh_check
+
+    - name: Get ESXi version
+      raw: vmware -v
+      register: esxi_version
+
+    - name: Check datastore free space
+      shell: |
+        for ds in $(vim-cmd hostsvc/datastore/listsummary | grep 'name =' | cut -d'"' -f2); do
+          free_space=$(vim-cmd hostsvc/datastore/info "$ds" | grep 'freeSpace' | cut -d'=' -f2 | cut -d',' -f1)
+          free_gb=$((free_space / 1073741824))
+          echo "$ds: ${free_gb}GB"
+        done
+      register: datastore_info
+
+    - name: Check for running VMs
+      shell: vim-cmd vmsvc/getallvms | grep -v "^Vmid" | wc -l
+      register: vm_count
+
+    - name: Run VDT tool if available
+      shell: |
+        if [ -f /opt/vdt/vdt.py ]; then
+          python /opt/vdt/vdt.py --check
+        else
+          echo "VDT tool not found"
+        fi
+      register: vdt_result
+      ignore_errors: yes
+
+    - name: Store pre-check results
+      set_fact:
+        precheck_results:
+          ssh_enabled: true
+          esxi_version: "{{ esxi_version.stdout }}"
+          datastore_info: "{{ datastore_info.stdout }}"
+          vm_count: "{{ vm_count.stdout }}"
+          vdt_check: "{{ vdt_result.stdout }}"
+
+    - name: Fail if insufficient datastore space
+      fail:
+        msg: "Insufficient datastore space. Need at least 2GB free."
+      when: "'2GB' not in datastore_info.stdout and '3GB' not in datastore_info.stdout"

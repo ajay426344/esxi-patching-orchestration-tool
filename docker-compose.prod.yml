@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  backend:
+    restart: always
+    command: gunicorn app:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+    environment:
+      DEBUG: "false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    restart: always
+    environment:
+      - NGINX_HOST=your-domain.com
+
+  db:
+    restart: always
+    volumes:
+      - ./backups:/backups
+
+  redis:
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}

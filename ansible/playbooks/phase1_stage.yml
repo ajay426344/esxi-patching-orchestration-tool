@@ -1,0 +1,48 @@
+---
+- name: ESXi Phase 1 - Stage Patches
+  hosts: all
+  gather_facts: no
+  vars:
+    ansible_user: "{{ esxi_username }}"
+    ansible_password: "{{ esxi_password }}"
+    ansible_connection: ssh
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    patch_depot: "/vmfs/volumes/datastore1/{{ patch_file }}"
+  
+  tasks:
+    - name: Upload patch file to host
+      copy:
+        src: "../patches/{{ patch_file }}"
+        dest: "{{ patch_depot }}"
+      
+    - name: List available profiles in depot
+      shell: |
+        esxcli software sources profile list -d {{ patch_depot }}
+      register: profiles_list
+
+    - name: Extract profile name
+      set_fact:
+        profile_name: "{{ profiles_list.stdout_lines[2].split()[0] }}"
+
+    - name: Dry-run patch installation
+      shell: |
+        esxcli software profile update -d {{ patch_depot }} \
+        -p {{ profile_name }} --dry-run
+      register: dry_run_result
+
+    - name: Stage patch with no-live-install
+      shell: |
+        esxcli software profile update -d {{ patch_depot }} \
+        -p {{ profile_name }} --no-live-install
+      register: stage_result
+
+    - name: Verify staging successful
+      fail:
+        msg: "Patch staging failed: {{ stage_result.stderr }}"
+      when: stage_result.rc != 0
+
+    - name: Clean up patch file after successful staging
+      file:
+        path: "{{ patch_depot }}"
+        state: absent
+      when: stage_result.rc == 0
